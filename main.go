@@ -6,6 +6,11 @@ import (
 	"github.com/hashicorp/terraform/terraform"
 )
 
+type ExampleClient struct {
+	ApiKey string
+	Url    string
+}
+
 func main() {
 	opts := plugin.ServeOpts{
 		ProviderFunc: Provider,
@@ -45,6 +50,18 @@ func Provider() terraform.ResourceProvider {
 					},
 				},
 			},
+		},
+		ConfigureFunc: func(d *schema.ResourceData) (interface{}, error) {
+			client := ExampleClient{
+				ApiKey: d.Get("api_key").(string),
+				Url:    d.Get("url").(string),
+			}
+
+			// You could have some field validations here, like checking that
+			// the API Key is has not expired or that the username/password
+			// combination is valid, etc.
+
+			return client, nil
 		},
 	}
 }
