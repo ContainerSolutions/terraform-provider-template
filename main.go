@@ -7,8 +7,10 @@ import (
 )
 
 type ExampleClient struct {
-	ApiKey string
-	Url    string
+	ApiKey     string
+	Endpoint   string
+	Timeout    int
+	MaxRetries int
 }
 
 func main() {
@@ -20,50 +22,89 @@ func main() {
 
 func Provider() terraform.ResourceProvider {
 	return &schema.Provider{ // Source https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/provider.go#L20-L43
-		Schema: map[string]*schema.Schema{ // List of supported configuration fields for your provider. Source https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/schema.go#L29-L142
-			"api_key": &schema.Schema{ // The provider understands that there is a field called "api_key"
-				Type:        schema.TypeString, // Other supported types https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/schema.go#L36-L42
-				Required:    true,
-				Description: "API Key used to authenticate with the service provider",
-			},
-			"url": &schema.Schema{ // The provider understands that there is a field called "url"
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The URL to the API",
-			},
+		Schema:        providerSchema(),
+		ResourcesMap:  providerResources(),
+		ConfigureFunc: providerConfigure,
+	}
+}
+
+// List of supported configuration fields for your provider.
+// Here we define a linked list of all the fields that we want to
+// support in our provider (api_key, endpoint, timeout & max_retries).
+// More info in https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/schema.go#L29-L142
+func providerSchema() map[string]*schema.Schema {
+	return map[string]*schema.Schema{
+		"api_key": &schema.Schema{
+			Type:        schema.TypeString,
+			Required:    true,
+			Description: "API Key used to authenticate with the service provider",
 		},
-		ResourcesMap: map[string]*schema.Resource{ // Source https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/resource.go#L17-L81
-			"example_server": &schema.Resource{
-				SchemaVersion: 1,
-				Create:        createFunc,
-				Read:          readFunc,
-				Update:        updateFunc,
-				Delete:        deleteFunc,
-				Schema: map[string]*schema.Schema{ // List of supported configuration fields for your resource
-					"hostname": &schema.Schema{ // The provider understands that the resource "example_server" has a field called "hostname"
-						Type:     schema.TypeString,
-						Required: true,
-					},
-					"cpus": &schema.Schema{ // The provider understands that the resource "example_server" has a field called "cpus"
-						Type:     schema.TypeInt,
-						Required: true,
-					},
+		"endpoint": &schema.Schema{
+			Type:        schema.TypeString,
+			Required:    true,
+			Description: "The URL to the API",
+		},
+		"timeout": &schema.Schema{
+			Type:        schema.TypeInt,
+			Required:    true,
+			Description: "Max. wait time we should wait for a successful connection to the API",
+		},
+		"max_retries": &schema.Schema{
+			Type:        schema.TypeInt,
+			Required:    true,
+			Description: "The max. amount of times we will retry to connect to the API",
+		},
+	}
+}
+
+// List of supported resources and their configuration fields.
+// Here we define da linked list of all the resources that we want to
+// support in our provider. As an example, if you were to write an AWS provider
+// which supported resources like ec2 instances, elastic balancers and things of that sort
+// then this would be the place to declare them.
+// More info here https://github.com/hashicorp/terraform/blob/v0.6.6/helper/schema/resource.go#L17-L81
+func providerResources() map[string]*schema.Resource {
+	return map[string]*schema.Resource{
+		"awesome_machine": &schema.Resource{
+			SchemaVersion: 1,
+			Create:        createFunc,
+			Read:          readFunc,
+			Update:        updateFunc,
+			Delete:        deleteFunc,
+			Schema: map[string]*schema.Schema{ // List of supported configuration fields for your resource
+				"name": &schema.Schema{
+					Type:     schema.TypeString,
+					Required: true,
+				},
+				"cpus": &schema.Schema{
+					Type:     schema.TypeInt,
+					Required: true,
+				},
+				"ram": &schema.Schema{
+					Type:     schema.TypeInt,
+					Required: true,
 				},
 			},
 		},
-		ConfigureFunc: func(d *schema.ResourceData) (interface{}, error) {
-			client := ExampleClient{
-				ApiKey: d.Get("api_key").(string),
-				Url:    d.Get("url").(string),
-			}
-
-			// You could have some field validations here, like checking that
-			// the API Key is has not expired or that the username/password
-			// combination is valid, etc.
-
-			return client, nil
-		},
 	}
+}
+
+// This is the function used to fetch the configuration params given
+// to our provider which we will use to initialise a dummy client that
+// interacts with the API.
+func providerConfigure(d *schema.ResourceData) (interface{}, error) {
+	client := ExampleClient{
+		ApiKey:     d.Get("api_key").(string),
+		Endpoint:   d.Get("endpoint").(string),
+		Timeout:    d.Get("timeout").(int),
+		MaxRetries: d.Get("max_retries").(int),
+	}
+
+	// You could have some field validations here, like checking that
+	// the API Key is has not expired or that the username/password
+	// combination is valid, etc.
+
+	return client, nil
 }
 
 /*\
