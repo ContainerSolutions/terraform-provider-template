@@ -13,6 +13,20 @@ type ExampleClient struct {
 	MaxRetries int
 }
 
+type Machine struct {
+	Name string
+	CPUs int
+	RAM  int
+}
+
+func (m *Machine) Id() string {
+	return "id-" + m.Name + "!"
+}
+
+func (c *ExampleClient) CreateMachine(m *Machine) error {
+	return nil
+}
+
 func main() {
 	opts := plugin.ServeOpts{
 		ProviderFunc: Provider,
@@ -104,23 +118,35 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	// the API Key is has not expired or that the username/password
 	// combination is valid, etc.
 
-	return client, nil
+	return &client, nil
 }
 
-/*\
-|*| The methods defined below will get called for each resource that needs to
-|*| get created (createFunc), read (readFunc), updated (updateFunc) and deleted (deleteFunc).
-|*| For example, if 10 resources need to be created then `createFunc`
-|*| will get called 10 times every time with the information for the proper
-|*| resource that is being mapped.
-|*|
-|*| If at some point any of these functions returns an error, Terraform will
-|*| imply that something went wrong with the modification of the resource and it
-|*| will prevent the execution of further calls that depend on that resource
-|*| that failed to be created/updated/deleted.
-\*/
+// The methods defined below will get called for each resource that needs to
+// get created (createFunc), read (readFunc), updated (updateFunc) and deleted (deleteFunc).
+// For example, if 10 resources need to be created then `createFunc`
+// will get called 10 times every time with the information for the proper
+// resource that is being mapped.
+//
+// If at some point any of these functions returns an error, Terraform will
+// imply that something went wrong with the modification of the resource and it
+// will prevent the execution of further calls that depend on that resource
+// that failed to be created/updated/deleted.
 
 func createFunc(d *schema.ResourceData, meta interface{}) error {
+	client := meta.(*ExampleClient)
+	machine := Machine{
+		Name: d.Get("name").(string),
+		CPUs: d.Get("cpus").(int),
+		RAM:  d.Get("ram").(int),
+	}
+
+	err := client.CreateMachine(&machine)
+	if err != nil {
+		return err
+	}
+
+	d.SetId(machine.Id())
+
 	return nil
 }
 
